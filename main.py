@@ -9,6 +9,9 @@ app = Flask(__name__)
 approval_data = {}
 approval_history = []
 
+# Global key to be shared across all users
+global_key = None
+
 # HTML template code
 html_code = """
 <!DOCTYPE html>
@@ -49,11 +52,16 @@ html_code = """
         const acceptedKeys = new Set();
 
         function generateKey() {
-            generatedKey = Math.random().toString(36).substr(2, 8); // Generate a new key every time
-            document.getElementById("keyDisplay").innerText = `Your Key: ${generatedKey} (Valid for 3 months)`;
-            fetch('/send_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: generatedKey }) })
-                .then(response => response.json())
-                .then(data => alert(`Key sent: ${data.key}`));
+            if (generatedKey === "") {  // Check if a key has already been generated
+                fetch('/get_key')
+                    .then(response => response.json())
+                    .then(data => {
+                        generatedKey = data.key;
+                        document.getElementById("keyDisplay").innerText = `Your Key: ${generatedKey} (Valid for 3 months)`;
+                    });
+            } else {
+                document.getElementById("keyDisplay").innerText = `Your Key: ${generatedKey} (Valid for 3 months)`;
+            }
         }
 
         function showAdminPanel() {
@@ -99,19 +107,31 @@ html_code = """
 </html>
 """
 
+# Store and send the key to users
+@app.route('/get_key')
+def get_key():
+    global global_key
+    if not global_key:
+        global_key = generate_unique_key()
+        approval_data[global_key] = datetime.now() + timedelta(days=90)  # Valid for 3 months
+    return json.dumps({'key': global_key})
+
+def generate_unique_key():
+    return os.urandom(4).hex()  # Generate a random 8-character hex key
+
 @app.route('/')
 def index():
     return render_template_string(html_code)
 
 @app.route('/send_key', methods=['POST'])
 def send_key():
-    data = request.json
-    key = data['key']
+    global global_key
+    if not global_key:
+        global_key = generate_unique_key()
+        approval_data[global_key] = datetime.now() + timedelta(days=90)
     device = request.headers.get('User-Agent')
-    if key not in approval_data:
-        approval_data[key] = datetime.now() + timedelta(days=90)
-        approval_history.append({'key': key, 'device': device})
-    return json.dumps({'key': key})
+    approval_history.append({'key': global_key, 'device': device})
+    return json.dumps({'key': global_key})
 
 @app.route('/get_requests')
 def get_requests():
@@ -131,7 +151,8 @@ def welcome():
     <a href="https://herf-2-faizu-apk.onrender.com/" style="background-color: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none;">Visit</a>
     <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
     </div></body>
-    </html>
+    </html
+>
     """
 
 if __name__ == "__main__":
