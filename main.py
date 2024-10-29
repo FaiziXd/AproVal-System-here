@@ -26,9 +26,16 @@ html_code = """
 </head>
 <body>
     <h1>Approval System</h1>
-    <div id="key-section">
-        <button class="button" onclick="sendApproval()">Request Approval</button>
+    <div id="name-section">
+        <input type="text" id="userName" placeholder="Enter your name">
+        <button class="button" onclick="sendApproval()">Submit</button>
+    </div>
+    <div id="key-section" style="display: none;">
         <div class="user-key" id="keyDisplay"></div>
+        <div id="contactOption" style="display: none;">
+            <h2>Contact Option</h2>
+            <p>If you have any questions, contact us!</p>
+        </div>
     </div>
     <button class="button" onclick="showAdminPanel()">Admin Panel</button>
     
@@ -41,14 +48,21 @@ html_code = """
 
     <script>
         function sendApproval() {
+            const userName = document.getElementById("userName").value;
+            if (!userName) {
+                alert("Please enter your name.");
+                return;
+            }
             fetch('/send_key', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
+                body: JSON.stringify({ name: userName })
             })
             .then(response => response.json())
             .then(data => {
                 document.getElementById("keyDisplay").innerText = data.message;
+                document.getElementById("key-section").style.display = "block";
+                document.getElementById("contactOption").style.display = "block"; // Show contact option
             });
         }
 
@@ -63,7 +77,7 @@ html_code = """
                 .then(response => response.json())
                 .then(data => {
                     let requestsHTML = data.requests.map(req => `
-                        <div>Device: ${req.device}, Key: ${req.key}
+                        <div>Name: ${req.name}, Mobile: ${req.mobile}
                             <button onclick="approveRequest('${req.key}')">Approve</button>
                         </div>`).join('');
                     document.getElementById("approvalRequests").innerHTML = requestsHTML;
@@ -88,6 +102,53 @@ html_code = """
 </html>
 """
 
+# Function to generate a unique key for each device
+def generate_unique_key():
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+
+@app.route('/')
+def index():
+    return render_template_string(html_code)
+
+@app.route('/send_key', methods=['POST'])
+def send_key():
+    device = request.headers.get('User-Agent')
+    user_data = request.json
+    name = user_data.get('name')
+
+    if not name:
+        return jsonify({"message": "Name is required."}), 400
+
+    key = generate_unique_key()
+
+    # Check if the device already has an approved key
+    if device in used_keys:
+        return jsonify({"message": "You already have an approved key. Wait for 3 months or request a new one."})
+    
+    # Store the key with device info and user details
+    approval_history[key] = {"device": device, "name": name, "mobile": "User Mobile Number Here"}  # Update with mobile number as needed
+    return jsonify({"key": key, "message": "Aapka Approval send ho gaya hai! Apna name bata ke approval le sakte hain."})
+
+@app.route('/get_requests')
+def get_requests():
+    return jsonify({"requests": [{"key": k, "device": v['device'], "name": v['name'], "mobile": v['mobile']} for k, v in approval_history.items()]})
+
+@app.route('/approve/<key>', methods=['POST'])
+def approve_request(key):
+    if key in approval_history:
+        approval_data[key] = datetime.now() + timedelta(days=90)  # Valid for 3 months
+        used_keys[approval_history[key]['device']] = key  # Mark this device as having used the key
+        del approval_history[key]  # Remove from pending requests
+        # Redirect to welcome page
+        return redirect(url_for('welcome', key=key))
+    return '', 204
+
+@app.route('/welcome/<key>')
+def welcome(key):
+    if key in approval_data and approval_data[key] > datetime.now():
+        return render_template_string(welcome_page)  # Ensure welcome page is displayed
+    return "Access Denied. Approval required.", 403
+
 # HTML Template for Welcome Page
 welcome_page = """
 <!DOCTYPE html>
@@ -108,47 +169,6 @@ welcome_page = """
 </body>
 </html>
 """
-
-# Function to generate a unique key for each device
-def generate_unique_key():
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-
-@app.route('/')
-def index():
-    return render_template_string(html_code)
-
-@app.route('/send_key', methods=['POST'])
-def send_key():
-    device = request.headers.get('User-Agent')
-    key = generate_unique_key()
-
-    # Check if the device already has an approved key
-    if device in used_keys:
-        return jsonify({"message": "You already have an approved key. Wait for 3 months or request a new one."})
-    
-    # Store the key with device info
-    approval_history[key] = {"device": device}
-    return jsonify({"key": key, "message": "Your key is pending approval."})
-
-@app.route('/get_requests')
-def get_requests():
-    return jsonify({"requests": [{"key": k, "device": v['device']} for k, v in approval_history.items()]})
-
-@app.route('/approve/<key>', methods=['POST'])
-def approve_request(key):
-    if key in approval_history:
-        approval_data[key] = datetime.now() + timedelta(days=90)  # Valid for 3 months
-        used_keys[approval_history[key]['device']] = key  # Mark this device as having used the key
-        del approval_history[key]  # Remove from pending requests
-        # Redirect to welcome page
-        return redirect(url_for('welcome', key=key))
-    return '', 204
-
-@app.route('/welcome/<key>')
-def welcome(key):
-    if key in approval_data and approval_data[key] > datetime.now():
-        return render_template_string(welcome_page)
-    return "Access Denied. Approval required.", 403
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
