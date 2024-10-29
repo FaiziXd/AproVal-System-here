@@ -140,7 +140,7 @@ def index():
                     fetch('/admin_requests')
                         .then(response => response.json())
                         .then(data => {
-                            let requestsHTML = data.map(req => `
+                            let requestsHTML = data.requests.map(req => `
                                 <div class="user-request">
                                     <p><strong>Name:</strong> ${req.name}</p>
                                     <button class="button" onclick="approveRequest('${req.name}')">Approve</button>
@@ -206,3 +206,4 @@ def welcome(name):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+    
