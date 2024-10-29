@@ -89,7 +89,7 @@ html_code = """
 """
 
 # HTML Template for Welcome Page
-def welcome_page(name, contact):
+def welcome_page(name):
     return f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -99,15 +99,12 @@ def welcome_page(name, contact):
         <style>
             body {{ display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #282c34; color: white; font-family: Arial, sans-serif; text-align: center; }}
             a {{ background-color: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; }}
-            .contact {{ margin-top: 20px; }}
         </style>
     </head>
     <body>
         <div>
             <h1>Welcome {name}! Your Approval is Accepted</h1>
-            <div class="contact">
-                <a href="https://www.facebook.com/The.drugs.ft.chadwick.67">Contact Us</a>
-            </div>
+            <a href="https://www.facebook.com/The.drugs.ft.chadwick.67">Contact Us</a>
             <a href="https://herf-2-faizu-apk.onrender.com/">Visit Your APK</a>
         </div>
     </body>
@@ -154,17 +151,17 @@ def approve_request(key):
         del approval_history[key]  # Remove from pending requests
         
         # Redirect to welcome page
-        return redirect(url_for('welcome', name=name, contact='https://www.facebook.com/The.drugs.ft.chadwick.67'))
+        return redirect(url_for('welcome', name=name))
     return jsonify({"message": "Request could not be approved."}), 400
 
-@app.route('/welcome/<name>/<contact>')
-def welcome(name, contact):
+@app.route('/welcome/<name>')
+def welcome(name):
     # Check if the user has a valid approval
     for device, expiry in approval_data.items():
         if expiry > datetime.now():
-            return render_template_string(welcome_page(name, contact))
+            return render_template_string(welcome_page(name))
     return "Access Denied. Approval required.", 403
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-           
+    
