@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 # Data storage for approvals
 approval_data = {}  # Stores approved keys with expiration dates
-approval_history = []  # Stores pending approval requests
+approval_history = {}  # Stores pending approval requests
 
 # HTML Template for Main Page
 html_code = """
@@ -102,7 +102,7 @@ welcome_page = """
 </html>
 """
 
-# Generate unique key for each device
+# Function to generate a unique key for each device
 def generate_unique_key():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
@@ -112,29 +112,31 @@ def index():
 
 @app.route('/send_key', methods=['POST'])
 def send_key():
-    key = generate_unique_key()
     device = request.headers.get('User-Agent')
-    if key not in approval_data:
-        approval_history.append({"key": key, "device": device})
-    return jsonify({"key": key})
+    key = generate_unique_key()
+    
+    # Store the key with device info
+    approval_history[key] = {"device": device}
+    return jsonify({"key": key, "status": "Pending Approval"})
 
 @app.route('/get_requests')
 def get_requests():
-    return jsonify({"requests": approval_history})
+    return jsonify({"requests": [{"key": k, "device": v['device']} for k, v in approval_history.items()]})
 
 @app.route('/approve/<key>', methods=['POST'])
 def approve_request(key):
-    if key in [req['key'] for req in approval_history]:
-        approval_data[key] = datetime.now() + timedelta(days=90)
+    if key in approval_history:
+        approval_data[key] = datetime.now() + timedelta(days=90)  # Valid for 3 months
+        del approval_history[key]  # Remove from pending requests
+        # Redirect to welcome page
+        return redirect(url_for('welcome', key=key))
     return '', 204
 
 @app.route('/welcome/<key>')
 def welcome(key):
-    # Check if the key is approved
     if key in approval_data and approval_data[key] > datetime.now():
         return render_template_string(welcome_page)
-    else:
-        return "Access Denied. Approval required.", 403
+    return "Access Denied. Approval required.", 403
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
