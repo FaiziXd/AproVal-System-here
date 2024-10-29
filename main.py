@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 
 # Track approved keys and approval history
-approval_data = {}
-approval_history = []
+approval_data = {}  # Stores approval expiration
+approval_history = []  # Tracks each approval request
 
 # HTML template code
 html_code = """
@@ -29,7 +29,7 @@ html_code = """
 <body>
 
     <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
-    <div id="welcome-section" class="hidden">
+    <div id="welcome-section">
         <div class="user-key" id="keyDisplay"></div>
         <button class="button" id="sendApproval" onclick="generateKey()">Send Approval</button>
     </div>
@@ -46,7 +46,6 @@ html_code = """
 
     <script>
         let generatedKey = "";
-        const approvalRequests = [];
         const acceptedKeys = new Set();
 
         function generateKey() {
@@ -119,7 +118,7 @@ def send_key():
 
 @app.route('/get_requests')
 def get_requests():
-    requests = [{'key': key, 'device': details['device']} for key, details in approval_history.items() if key not in approval_data]
+    requests = [{'key': entry['key'], 'device': entry['device']} for entry in approval_history if entry['key'] not in approval_data]
     return json.dumps({'requests': requests})
 
 @app.route('/accept_request/<key>', methods=['POST'])
@@ -139,4 +138,4 @@ def welcome():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
-  
+    
