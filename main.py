@@ -8,7 +8,6 @@ app = Flask(__name__)
 # Data storage for approvals
 approval_data = {}  # Stores approved keys with expiration dates
 approval_history = {}  # Stores pending approval requests
-used_keys = {}  # Stores keys that have been used
 
 # HTML Template for Main Page
 html_code = """
@@ -26,16 +25,10 @@ html_code = """
 </head>
 <body>
     <h1>Approval System</h1>
-    <div id="name-section">
-        <input type="text" id="userName" placeholder="Enter your name">
-        <button class="button" onclick="sendApproval()">Submit</button>
-    </div>
-    <div id="key-section" style="display: none;">
+    <div id="key-section">
+        <input type="text" id="userName" placeholder="Enter Your Name" />
+        <button class="button" onclick="sendApproval()">Request Approval</button>
         <div class="user-key" id="keyDisplay"></div>
-        <div id="contactOption" style="display: none;">
-            <h2>Contact Option</h2>
-            <p>If you have any questions, contact us!</p>
-        </div>
     </div>
     <button class="button" onclick="showAdminPanel()">Admin Panel</button>
     
@@ -49,10 +42,6 @@ html_code = """
     <script>
         function sendApproval() {
             const userName = document.getElementById("userName").value;
-            if (!userName) {
-                alert("Please enter your name.");
-                return;
-            }
             fetch('/send_key', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -61,8 +50,6 @@ html_code = """
             .then(response => response.json())
             .then(data => {
                 document.getElementById("keyDisplay").innerText = data.message;
-                document.getElementById("key-section").style.display = "block";
-                document.getElementById("contactOption").style.display = "block"; // Show contact option
             });
         }
 
@@ -77,7 +64,7 @@ html_code = """
                 .then(response => response.json())
                 .then(data => {
                     let requestsHTML = data.requests.map(req => `
-                        <div>Name: ${req.name}, Mobile: ${req.mobile}
+                        <div>Device: ${req.device}, Name: ${req.name}
                             <button onclick="approveRequest('${req.key}')">Approve</button>
                         </div>`).join('');
                     document.getElementById("approvalRequests").innerHTML = requestsHTML;
@@ -102,7 +89,7 @@ html_code = """
 </html>
 """
 
-# Function to generate a unique key for each device
+# Generate unique key for each device
 def generate_unique_key():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
@@ -119,57 +106,39 @@ def send_key():
     if not name:
         return jsonify({"message": "Name is required."}), 400
 
-    key = generate_unique_key()
-
     # Check if the device already has an approved key
-    if device in used_keys:
-        return jsonify({"message": "You already have an approved key. Wait for 3 months or request a new one."})
+    if device in approval_data and approval_data[device] > datetime.now():
+        return jsonify({"message": "Aapka approval abhi tak valid hai. Agle 3 mahine tak koi naya request nahi karna."})
+
+    key = generate_unique_key()
     
     # Store the key with device info and user details
-    approval_history[key] = {"device": device, "name": name, "mobile": "User Mobile Number Here"}  # Update with mobile number as needed
+    approval_history[key] = {"device": device, "name": name}
     return jsonify({"key": key, "message": "Aapka Approval send ho gaya hai! Apna name bata ke approval le sakte hain."})
 
 @app.route('/get_requests')
 def get_requests():
-    return jsonify({"requests": [{"key": k, "device": v['device'], "name": v['name'], "mobile": v['mobile']} for k, v in approval_history.items()]})
+    return jsonify({"requests": [{"key": k, "device": v['device'], "name": v['name']} for k, v in approval_history.items()]})
 
 @app.route('/approve/<key>', methods=['POST'])
 def approve_request(key):
     if key in approval_history:
-        approval_data[key] = datetime.now() + timedelta(days=90)  # Valid for 3 months
-        used_keys[approval_history[key]['device']] = key  # Mark this device as having used the key
+        # Store approval for device
+        device = approval_history[key]['device']
+        approval_data[device] = datetime.now() + timedelta(days=90)  # Valid for 3 months
         del approval_history[key]  # Remove from pending requests
+        
         # Redirect to welcome page
         return redirect(url_for('welcome', key=key))
     return '', 204
 
 @app.route('/welcome/<key>')
 def welcome(key):
-    if key in approval_data and approval_data[key] > datetime.now():
-        return render_template_string(welcome_page)  # Ensure welcome page is displayed
+    # Check if the key is approved
+    if key in approval_data:
+        return render_template_string(welcome_page)
     return "Access Denied. Approval required.", 403
-
-# HTML Template for Welcome Page
-welcome_page = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Welcome</title>
-    <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #282c34; color: white; font-family: Arial, sans-serif; text-align: center; }
-        a { background-color: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <div>
-        <h1>Welcome! Your Approval is Accepted</h1>
-        <a href="https://herf-2-faizu-apk.onrender.com/">Visit Your APK</a>
-    </div>
-</body>
-</html>
-"""
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-    
+        
