@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 
 # Track approved keys and approval history
-approval_data = {}  # Stores approval expiration
-approval_history = []  # Tracks each approval request
+approval_data = {}
+approval_history = []
 
 # HTML template code
 html_code = """
@@ -29,7 +29,7 @@ html_code = """
 <body>
 
     <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
-    <div id="welcome-section">
+    <div id="welcome-section" class="hidden">
         <div class="user-key" id="keyDisplay"></div>
         <button class="button" id="sendApproval" onclick="generateKey()">Send Approval</button>
     </div>
@@ -46,6 +46,7 @@ html_code = """
 
     <script>
         let generatedKey = "";
+        const approvalRequests = [];
         const acceptedKeys = new Set();
 
         function generateKey() {
@@ -130,7 +131,7 @@ def accept_request(key):
 @app.route('/welcome')
 def welcome():
     return """
-    <html><body style="display: flex; justify-content: center; align-items: center; height: 100vh; background-image: url('https://iili.io/2BSHySR.jpg'); background-size: cover; color: white; font-family: Arial, sans-serif; text-align: center;">
+    <html><body style="display: flex; justify-content: center; align-items: center; height: 100vh; background-image: url('https://raw.githubusercontent.com/FaiziXd/AproVal-System-here/refs/heads/main/aba8e123f7e1a97a1d35e50cab476b79.jpg'); background-size: cover; color: white; font-family: Arial, sans-serif; text-align: center;">
     <div><h1>Welcome Dear, Now Your Approval is Accepted. Visit Your Own APK.</h1>
     <a href="https://herf-2-faizu-apk.onrender.com/" style="background-color: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none;">Visit</a></div></body></html>
     """
