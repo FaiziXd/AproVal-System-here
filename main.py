@@ -8,6 +8,7 @@ app = Flask(__name__)
 # Data storage for approvals
 approval_data = {}  # Stores approved keys with expiration dates
 approval_history = {}  # Stores pending approval requests
+used_keys = {}  # Stores keys that have been used
 
 # HTML Template for Main Page
 html_code = """
@@ -47,7 +48,7 @@ html_code = """
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById("keyDisplay").innerText = `Your Key: ${data.key} (Pending Approval)`;
+                document.getElementById("keyDisplay").innerText = data.message;
             });
         }
 
@@ -74,7 +75,13 @@ html_code = """
 
         function approveRequest(key) {
             fetch(`/approve/${key}`, { method: 'POST' })
-            .then(() => alert('Request approved!'));
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;  // Redirect to welcome page
+                } else {
+                    alert('Request could not be approved.');
+                }
+            });
         }
     </script>
 </body>
@@ -114,10 +121,14 @@ def index():
 def send_key():
     device = request.headers.get('User-Agent')
     key = generate_unique_key()
+
+    # Check if the device already has an approved key
+    if device in used_keys:
+        return jsonify({"message": "You already have an approved key. Wait for 3 months or request a new one."})
     
     # Store the key with device info
     approval_history[key] = {"device": device}
-    return jsonify({"key": key, "status": "Pending Approval"})
+    return jsonify({"key": key, "message": "Your key is pending approval."})
 
 @app.route('/get_requests')
 def get_requests():
@@ -127,6 +138,7 @@ def get_requests():
 def approve_request(key):
     if key in approval_history:
         approval_data[key] = datetime.now() + timedelta(days=90)  # Valid for 3 months
+        used_keys[approval_history[key]['device']] = key  # Mark this device as having used the key
         del approval_history[key]  # Remove from pending requests
         # Redirect to welcome page
         return redirect(url_for('welcome', key=key))
