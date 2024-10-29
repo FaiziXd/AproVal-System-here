@@ -1,16 +1,13 @@
 from flask import Flask, render_template_string, request, redirect, url_for
 import json
-import os
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
 # Track approved keys and approval history
-approval_data = {}
-approval_history = []
-
-# Global key to be shared across all users
-global_key = None
+approval_data = {}  # Approved keys with expiration dates
+approval_history = []  # List of approval requests (pending and approved)
+global_key = "018289e0"  # Fixed key for all users
 
 # HTML template code
 html_code = """
@@ -31,12 +28,10 @@ html_code = """
 </head>
 <body>
 
-    <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
-    <div id="welcome-section" class="hidden">
-        <div class="user-key" id="keyDisplay"></div>
-        <button class="button" id="sendApproval" onclick="generateKey()">Send Approval</button>
-    </div>
+    <div class="user-key" id="keyDisplay">Your Key: {{ global_key }} (Valid for 3 months)</div>
+    <button class="button" id="sendApproval" onclick="sendApprovalRequest()">Send Approval</button>
 
+    <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
     <div class="admin-panel" id="admin-panel">
         <h2>Admin Panel</h2>
         <input type="password" id="adminPassword" placeholder="Enter Password">
@@ -48,20 +43,12 @@ html_code = """
     </div>
 
     <script>
-        let generatedKey = "";
         const acceptedKeys = new Set();
 
-        function generateKey() {
-            if (generatedKey === "") {  // Check if a key has already been generated
-                fetch('/get_key')
-                    .then(response => response.json())
-                    .then(data => {
-                        generatedKey = data.key;
-                        document.getElementById("keyDisplay").innerText = `Your Key: ${generatedKey} (Valid for 3 months)`;
-                    });
-            } else {
-                document.getElementById("keyDisplay").innerText = `Your Key: ${generatedKey} (Valid for 3 months)`;
-            }
+        function sendApprovalRequest() {
+            fetch('/send_key', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+                .then(response => response.json())
+                .then(data => alert(`Approval request sent with key: ${data.key}`));
         }
 
         function showAdminPanel() {
@@ -90,7 +77,8 @@ html_code = """
                         }
                     });
                     document.getElementById("requestsList").innerHTML = requestsHTML;
-                });
+                })
+                .catch(error => console.error("Error fetching requests:", error));
             document.getElementById("approvalRequests").classList.remove('hidden');
         }
 
@@ -99,7 +87,6 @@ html_code = """
                 .then(() => {
                     acceptedKeys.add(key);
                     alert(`Request accepted!`);
-                    window.open('/welcome', '_blank');
                 });
         }
     </script>
@@ -107,29 +94,15 @@ html_code = """
 </html>
 """
 
-# Store and send the key to users
-@app.route('/get_key')
-def get_key():
-    global global_key
-    if not global_key:
-        global_key = generate_unique_key()
-        approval_data[global_key] = datetime.now() + timedelta(days=90)  # Valid for 3 months
-    return json.dumps({'key': global_key})
-
-def generate_unique_key():
-    return os.urandom(4).hex()  # Generate a random 8-character hex key
-
 @app.route('/')
 def index():
-    return render_template_string(html_code)
+    return render_template_string(html_code, global_key=global_key)
 
 @app.route('/send_key', methods=['POST'])
 def send_key():
-    global global_key
-    if not global_key:
-        global_key = generate_unique_key()
-        approval_data[global_key] = datetime.now() + timedelta(days=90)
     device = request.headers.get('User-Agent')
+    if global_key not in approval_data:
+        approval_data[global_key] = datetime.now() + timedelta(days=90)  # Key is valid for 3 months
     approval_history.append({'key': global_key, 'device': device})
     return json.dumps({'key': global_key})
 
@@ -140,22 +113,10 @@ def get_requests():
 
 @app.route('/accept_request/<key>', methods=['POST'])
 def accept_request(key):
-    approval_data[key] = datetime.now() + timedelta(days=90)
+    if key in approval_data:
+        approval_data[key] = datetime.now() + timedelta(days=90)  # Extend expiration date
     return '', 204
 
-@app.route('/welcome')
-def welcome():
-    return """
-    <html><body style="display: flex; justify-content: center; align-items: center; height: 100vh; background-image: url('https://raw.githubusercontent.com/FaiziXd/AproVal-System-here/refs/heads/main/aba8e123f7e1a97a1d35e50cab476b79.jpg'); background-size: cover; color: white; font-family: Arial, sans-serif; text-align: center;">
-    <div><h1>Welcome Dear, Now Your Approval is Accepted. Visit Your Own APK.</h1>
-    <a href="https://herf-2-faizu-apk.onrender.com/" style="background-color: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none;">Visit</a>
-    <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
-    </div></body>
-    </html
->
-    """
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
     
