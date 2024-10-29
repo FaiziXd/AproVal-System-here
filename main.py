@@ -8,7 +8,6 @@ app = Flask(__name__)
 # Data storage for approvals
 approval_data = {}  # Stores approved users with expiration dates
 approval_history = {}  # Stores pending approval requests
-used_keys = {}  # Stores keys that have been used
 
 # HTML Template for Main Page
 html_code = """
@@ -191,10 +190,6 @@ welcome_page = """
 </html>
 """
 
-# Function to generate a unique key for each device
-def generate_unique_key():
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-
 @app.route('/')
 def index():
     return render_template_string(html_code)
@@ -227,8 +222,7 @@ def approve_request(name):
 def welcome(name):
     if name in approval_data and approval_data[name] > datetime.now():
         return render_template_string(welcome_page)
-    return "Access Denied. Approval required.", 403
+    return redirect(url_for('index'))  # Redirect to index page if access denied
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-    
