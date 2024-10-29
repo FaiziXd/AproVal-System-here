@@ -78,7 +78,7 @@ html_code = """
             fetch(`/approve/${key}`, { method: 'POST' })
             .then(response => {
                 if (response.redirected) {
-                    window.location.href = response.url;  // Redirect to welcome page
+                    window.location.href = response.url;  // Redirect to user welcome page
                 } else {
                     alert('Request could not be approved.');
                 }
@@ -89,7 +89,56 @@ html_code = """
 </html>
 """
 
-# Generate unique key for each device
+# HTML Template for Welcome Page
+def welcome_page(name, contact):
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Welcome</title>
+        <style>
+            body {{ display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #282c34; color: white; font-family: Arial, sans-serif; text-align: center; }}
+            a {{ background-color: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; }}
+            .contact {{ margin-top: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div>
+            <h1>Welcome {name}! Your Approval is Accepted</h1>
+            <div class="contact">
+                <a href="https://www.facebook.com/The.drugs.ft.chadwick.67">Contact Us</a>
+            </div>
+            <a href="https://herf-2-faizu-apk.onrender.com/">Visit Your APK</a>
+        </div>
+    </body>
+    </html>
+    """
+
+# HTML Template for Approval Page
+def approval_page(name):
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Approval Page</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; text-align: center; background-color: #282c34; color: white; }}
+            .button {{ background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }}
+        </style>
+    </head>
+    <body>
+        <h1>Approval Pending for {name}</h1>
+        <p>Your approval request has been sent. Please wait for the admin to accept your request.</p>
+        <div class="contact">
+            <a href="https://www.facebook.com/The.drugs.ft.chadwick.67">Contact Admin</a>
+        </div>
+    </body>
+    </html>
+    """
+
+# Function to generate a unique key for each device
 def generate_unique_key():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
@@ -114,7 +163,11 @@ def send_key():
     
     # Store the key with device info and user details
     approval_history[key] = {"device": device, "name": name}
-    return jsonify({"key": key, "message": "Aapka Approval send ho gaya hai! Apna name bata ke approval le sakte hain."})
+    return redirect(url_for('approval_page_display', name=name))
+
+@app.route('/approval_page/<name>')
+def approval_page_display(name):
+    return render_template_string(approval_page(name))
 
 @app.route('/get_requests')
 def get_requests():
@@ -125,20 +178,21 @@ def approve_request(key):
     if key in approval_history:
         # Store approval for device
         device = approval_history[key]['device']
+        name = approval_history[key]['name']
         approval_data[device] = datetime.now() + timedelta(days=90)  # Valid for 3 months
         del approval_history[key]  # Remove from pending requests
         
         # Redirect to welcome page
-        return redirect(url_for('welcome', key=key))
+        return redirect(url_for('welcome', key=key, name=name, contact='https://www.facebook.com/The.drugs.ft.chadwick.67'))
     return '', 204
 
-@app.route('/welcome/<key>')
-def welcome(key):
+@app.route('/welcome/<key>/<name>/<contact>')
+def welcome(key, name, contact):
     # Check if the key is approved
     if key in approval_data:
-        return render_template_string(welcome_page)
+        return render_template_string(welcome_page(name, contact))
     return "Access Denied. Approval required.", 403
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-        
+    
