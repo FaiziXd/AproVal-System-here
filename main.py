@@ -24,51 +24,14 @@ html_code = """
         .admin-panel { display: none; margin-top: 20px; color: white; }
         .user-key { font-size: 1.2em; margin-top: 20px; color: #ffdd57; }
         #adminButton { position: absolute; top: 20px; right: 20px; }
-
-        /* Animation styles */
-        .fade-in {
-            animation: fadeIn 1s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        /* Image animation */
-        .image-container {
-            position: relative;
-            width: 100%;
-            height: 300px;
-            overflow: hidden;
-            margin: 20px 0;
-        }
-        .image {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0;
-            animation: fade 6s infinite;
-        }
-        .image:nth-child(1) { animation-delay: 0s; }
-        .image:nth-child(2) { animation-delay: 3s; }
-
-        @keyframes fade {
-            0%, 100% { opacity: 0; }
-            50% { opacity: 1; }
-        }
     </style>
 </head>
 <body>
 
     <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
-    <div id="welcome-section" class="fade-in">
+    <div id="welcome-section" class="hidden">
         <div class="user-key" id="keyDisplay"></div>
         <button class="button" id="sendApproval" onclick="generateKey()">Send Approval</button>
-        <div class="image-container" id="approvalImage" style="display:none;">
-            <img class="image" src="https://example.com/your_image_url1.jpg" alt="Approval Image 1" />
-            <img class="image" src="https://example.com/your_image_url2.jpg" alt="Approval Image 2" />
-        </div>
     </div>
 
     <div class="admin-panel" id="admin-panel">
@@ -86,14 +49,11 @@ html_code = """
         const acceptedKeys = new Set();
 
         function generateKey() {
-            if (!generatedKey) {
-                generatedKey = Math.random().toString(36).substr(2, 8);
-                document.getElementById("keyDisplay").innerText = `Your Key: ${generatedKey} (Valid for 3 months)`;
-                document.getElementById("approvalImage").style.display = "block"; // Show approval images
-                fetch('/send_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: generatedKey }) })
-                    .then(response => response.json())
-                    .then(data => alert(`Key sent: ${data.key}`));
-            }
+            generatedKey = Math.random().toString(36).substr(2, 8); // Generate a new key every time
+            document.getElementById("keyDisplay").innerText = `Your Key: ${generatedKey} (Valid for 3 months)`;
+            fetch('/send_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: generatedKey }) })
+                .then(response => response.json())
+                .then(data => alert(`Key sent: ${data.key}`));
         }
 
         function showAdminPanel() {
@@ -169,7 +129,9 @@ def welcome():
     <html><body style="display: flex; justify-content: center; align-items: center; height: 100vh; background-image: url('https://raw.githubusercontent.com/FaiziXd/AproVal-System-here/refs/heads/main/aba8e123f7e1a97a1d35e50cab476b79.jpg'); background-size: cover; color: white; font-family: Arial, sans-serif; text-align: center;">
     <div><h1>Welcome Dear, Now Your Approval is Accepted. Visit Your Own APK.</h1>
     <a href="https://herf-2-faizu-apk.onrender.com/" style="background-color: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none;">Visit</a>
-    </div></body></html>
+    <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
+    </div></body>
+    </html>
     """
 
 if __name__ == "__main__":
