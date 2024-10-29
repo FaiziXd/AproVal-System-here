@@ -1,93 +1,80 @@
-from flask import Flask, render_template_string, request, redirect, url_for
-import json
+from flask import Flask, render_template_string, request, jsonify
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# Track approved keys and approval history
-approval_data = {}  # Approved keys with expiration dates
-approval_history = []  # List of approval requests (pending and approved)
-global_key = "018289e0"  # Fixed key for all users
+# Data storage for approvals
+approval_data = {}  # Stores approved keys with their expiration
+approval_history = []  # Stores pending approval requests
 
-# HTML template code
+# HTML template
 html_code = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Approval System</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #282c34; color: white; }
-        .button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; }
-        .button:hover { background-color: #c82333; }
-        .admin-panel { display: none; margin-top: 20px; color: white; }
-        .user-key { font-size: 1.2em; margin-top: 20px; color: #ffdd57; }
-        #adminButton { position: absolute; top: 20px; right: 20px; }
+        .button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        .admin-panel { display: none; color: white; margin-top: 20px; }
+        .user-key { font-size: 1.2em; color: #ffdd57; margin-top: 20px; }
     </style>
 </head>
 <body>
-
-    <div class="user-key" id="keyDisplay">Your Key: {{ global_key }} (Valid for 3 months)</div>
-    <button class="button" id="sendApproval" onclick="sendApprovalRequest()">Send Approval</button>
-
-    <button class="button" id="adminButton" onclick="showAdminPanel()">Admin Panel</button>
-    <div class="admin-panel" id="admin-panel">
+    <h1>Approval System</h1>
+    <div id="key-section">
+        <button class="button" onclick="sendApproval()">Request Approval</button>
+        <div class="user-key" id="keyDisplay"></div>
+    </div>
+    <button class="button" onclick="showAdminPanel()">Admin Panel</button>
+    
+    <div id="adminPanel" class="admin-panel">
         <h2>Admin Panel</h2>
-        <input type="password" id="adminPassword" placeholder="Enter Password">
-        <button class="button" onclick="checkAdminPassword()">Submit</button>
-        <div id="approvalRequests" class="hidden">
-            <h3>Approval Requests</h3>
-            <div id="requestsList"></div>
-        </div>
+        <input type="password" id="adminPassword" placeholder="Enter Admin Password">
+        <button class="button" onclick="checkPassword()">Login</button>
+        <div id="approvalRequests"></div>
     </div>
 
     <script>
-        const acceptedKeys = new Set();
+        let generatedKey = "";
 
-        function sendApprovalRequest() {
-            fetch('/send_key', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-                .then(response => response.json())
-                .then(data => alert(`Approval request sent with key: ${data.key}`));
+        function sendApproval() {
+            fetch('/send_key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("keyDisplay").innerText = `Your Key: ${data.key} (Valid for 3 months)`;
+            });
         }
 
         function showAdminPanel() {
-            document.getElementById("admin-panel").style.display = "block";
+            document.getElementById("adminPanel").style.display = "block";
         }
 
-        function checkAdminPassword() {
+        function checkPassword() {
             const password = document.getElementById("adminPassword").value;
             if (password === "THE FAIZU") {
-                loadApprovalRequests();
+                fetch('/get_requests')
+                .then(response => response.json())
+                .then(data => {
+                    let requestsHTML = data.requests.map(req => `
+                        <div>Device: ${req.device}, Key: ${req.key}
+                            <button onclick="approveRequest('${req.key}')">Approve</button>
+                        </div>`).join('');
+                    document.getElementById("approvalRequests").innerHTML = requestsHTML;
+                });
             } else {
-                alert("Incorrect Password!");
+                alert("Incorrect password!");
             }
         }
 
-        function loadApprovalRequests() {
-            fetch('/get_requests')
-                .then(response => response.json())
-                .then(data => {
-                    let requestsHTML = '';
-                    data.requests.forEach(request => {
-                        if (!acceptedKeys.has(request.key)) {
-                            requestsHTML += `<div>Device: ${request.device}, Key: ${request.key}
-                                <button onclick="acceptRequest('${request.key}')">Accept</button>
-                            </div>`;
-                        }
-                    });
-                    document.getElementById("requestsList").innerHTML = requestsHTML;
-                })
-                .catch(error => console.error("Error fetching requests:", error));
-            document.getElementById("approvalRequests").classList.remove('hidden');
-        }
-
-        function acceptRequest(key) {
-            fetch(`/accept_request/${key}`, { method: 'POST' })
-                .then(() => {
-                    acceptedKeys.add(key);
-                    alert(`Request accepted!`);
-                });
+        function approveRequest(key) {
+            fetch(`/approve/${key}`, { method: 'POST' })
+            .then(() => alert('Request approved!'));
         }
     </script>
 </body>
@@ -96,25 +83,25 @@ html_code = """
 
 @app.route('/')
 def index():
-    return render_template_string(html_code, global_key=global_key)
+    return render_template_string(html_code)
 
 @app.route('/send_key', methods=['POST'])
 def send_key():
+    key = "unique-key-1234"  # Static key for all users
     device = request.headers.get('User-Agent')
-    if global_key not in approval_data:
-        approval_data[global_key] = datetime.now() + timedelta(days=90)  # Key is valid for 3 months
-    approval_history.append({'key': global_key, 'device': device})
-    return json.dumps({'key': global_key})
+    expiration_date = datetime.now() + timedelta(days=90)
+    approval_data[key] = expiration_date
+    approval_history.append({"key": key, "device": device})
+    return jsonify({"key": key})
 
 @app.route('/get_requests')
 def get_requests():
-    requests = [{'key': entry['key'], 'device': entry['device']} for entry in approval_history if entry['key'] not in approval_data]
-    return json.dumps({'requests': requests})
+    return jsonify({"requests": approval_history})
 
-@app.route('/accept_request/<key>', methods=['POST'])
-def accept_request(key):
+@app.route('/approve/<key>', methods=['POST'])
+def approve_request(key):
     if key in approval_data:
-        approval_data[key] = datetime.now() + timedelta(days=90)  # Extend expiration date
+        approval_data[key] = datetime.now() + timedelta(days=90)  # Update expiration
     return '', 204
 
 if __name__ == "__main__":
