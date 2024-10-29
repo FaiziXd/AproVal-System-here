@@ -20,7 +20,6 @@ html_code = """
         body { font-family: Arial, sans-serif; text-align: center; background-color: #282c34; color: white; }
         .button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
         .admin-panel { display: none; color: white; margin-top: 20px; }
-        .user-key { font-size: 1.2em; color: #ffdd57; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -115,29 +114,6 @@ def welcome_page(name, contact):
     </html>
     """
 
-# HTML Template for Approval Page
-def approval_page(name):
-    return f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Approval Page</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; text-align: center; background-color: #282c34; color: white; }}
-            .button {{ background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }}
-        </style>
-    </head>
-    <body>
-        <h1>Approval Pending for {name}</h1>
-        <p>Your approval request has been sent. Please wait for the admin to accept your request.</p>
-        <div class="contact">
-            <a href="https://www.facebook.com/The.drugs.ft.chadwick.67">Contact Admin</a>
-        </div>
-    </body>
-    </html>
-    """
-
 # Function to generate a unique key for each device
 def generate_unique_key():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
@@ -159,15 +135,10 @@ def send_key():
     if device in approval_data and approval_data[device] > datetime.now():
         return jsonify({"message": "Aapka approval abhi tak valid hai. Agle 3 mahine tak koi naya request nahi karna."})
 
+    # Generate key and store request
     key = generate_unique_key()
-    
-    # Store the key with device info and user details
     approval_history[key] = {"device": device, "name": name}
-    return redirect(url_for('approval_page_display', name=name))
-
-@app.route('/approval_page/<name>')
-def approval_page_display(name):
-    return render_template_string(approval_page(name))
+    return jsonify({"message": "Your request has been sent for approval."})
 
 @app.route('/get_requests')
 def get_requests():
@@ -183,16 +154,17 @@ def approve_request(key):
         del approval_history[key]  # Remove from pending requests
         
         # Redirect to welcome page
-        return redirect(url_for('welcome', key=key, name=name, contact='https://www.facebook.com/The.drugs.ft.chadwick.67'))
-    return '', 204
+        return redirect(url_for('welcome', name=name, contact='https://www.facebook.com/The.drugs.ft.chadwick.67'))
+    return jsonify({"message": "Request could not be approved."}), 400
 
-@app.route('/welcome/<key>/<name>/<contact>')
-def welcome(key, name, contact):
-    # Check if the key is approved
-    if key in approval_data:
-        return render_template_string(welcome_page(name, contact))
+@app.route('/welcome/<name>/<contact>')
+def welcome(name, contact):
+    # Check if the user has a valid approval
+    for device, expiry in approval_data.items():
+        if expiry > datetime.now():
+            return render_template_string(welcome_page(name, contact))
     return "Access Denied. Approval required.", 403
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-    
+           
