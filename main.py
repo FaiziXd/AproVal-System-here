@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, redirect, url_for, request
+from flask import Flask, render_template_string, redirect, url_for, request, jsonify
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -6,6 +6,8 @@ app = Flask(__name__)
 # Data structures to hold approval requests and approvals
 approval_history = {}
 approval_data = {}
+pending_requests = []
+approved_users = []
 
 # HTML for the welcome page
 welcome_page = '''
@@ -20,7 +22,7 @@ welcome_page = '''
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background: url('https://raw.githubusercontent.com/FaiziXd/AproVal-System-here/refs/heads/main/296618a7fcc2574f667c59e3f2b83f72.jpg') no-repeat center center fixed;
+            background: url('https://your-image-url.jpg') no-repeat center center fixed;
             background-size: cover;
         }
         .welcome-container {
@@ -140,7 +142,7 @@ def index():
                     fetch('/admin_requests')
                         .then(response => response.json())
                         .then(data => {
-                            let requestsHTML = data.map(req => `
+                            let requestsHTML = data.requests.map(req => `
                                 <div class="user-request">
                                     <p><strong>Name:</strong> ${req.name}</p>
                                     <button class="button" onclick="approveRequest('${req.name}')">Approve</button>
@@ -193,7 +195,6 @@ def approve_request(name):
     if name in approval_history:
         approval_data[name] = datetime.now() + timedelta(days=90)  # 3 months approval
         del approval_history[name]  # Remove from pending approvals
-        print(f'Approved: {name}')  # Debugging line
         return redirect(url_for('welcome', name=name))
     return '', 204
 
@@ -205,10 +206,10 @@ def reject_request(name):
 
 @app.route('/welcome/<name>')
 def welcome(name):
-    print(f'Welcome page accessed for: {name}')  # Debugging line
     if name in approval_data and approval_data[name] > datetime.now():
         return render_template_string(welcome_page)
     return redirect(url_for('index'))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+    
